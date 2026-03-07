@@ -5,3 +5,9 @@ build
 *.log
 .DS_Store
 server/sandbox/temp
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
