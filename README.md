@@ -15,7 +15,7 @@ A full-stack proctored examination platform with integrated IDE, role-based acce
 
 ### Backend
 - Node.js + Express.js
-- MongoDB + Mongoose
+- MySQL + Prisma ORM
 - JWT Authentication
 - Socket.IO for real-time features
 - child_process for code execution
@@ -30,8 +30,8 @@ A full-stack proctored examination platform with integrated IDE, role-based acce
 ## Prerequisites
 
 - Node.js (v16 or higher)
-- MongoDB (local or Atlas)
-- Windows OS
+- MySQL (v8.0 or higher)
+- Windows/macOS/Linux
 - npm
 
 ## Setup Instructions
@@ -48,22 +48,40 @@ cd ../client
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Setup MySQL Database
+
+```bash
+# Login to MySQL
+mysql -u root -p
+
+# Create database
+CREATE DATABASE olas;
+EXIT;
+```
+
+### 3. Configure Environment
 
 Create `server/.env` file:
 
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/olas
+DATABASE_URL="mysql://root:your_password@localhost:3306/olas"
 JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
 NODE_ENV=development
 CLIENT_URL=http://localhost:5173
 ```
 
-### 3. Seed Database
+### 4. Setup Database Schema
 
 ```bash
 cd server
+npm run prisma:generate
+npm run prisma:push
+```
+
+### 5. Seed Database
+
+```bash
 npm run seed
 ```
 
@@ -72,7 +90,7 @@ This creates:
 - Faculty: faculty@olas.com / faculty123
 - Student: student@olas.com / student123
 
-### 4. Run Application
+### 6. Run Application
 
 ```bash
 # Terminal 1 - Backend
@@ -84,16 +102,39 @@ cd client
 npm run dev
 ```
 
-### 5. Access Application
+### 7. Access Application
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:5000
+
+## Quick Setup (Automated)
+
+For faster setup, use the migration scripts:
+
+**Windows:**
+```bash
+cd server
+migrate-to-mysql.bat
+```
+
+**macOS/Linux:**
+```bash
+cd server
+chmod +x migrate-to-mysql.sh
+./migrate-to-mysql.sh
+```
 
 ## Default Credentials
 
 - **Admin**: admin@olas.com / admin123
 - **Faculty**: faculty@olas.com / faculty123
 - **Student**: student@olas.com / student123
+
+## Documentation
+
+- **MySQL Setup Guide**: See [MYSQL_SETUP.md](MYSQL_SETUP.md)
+- **Quick Start**: See [QUICK_START_MYSQL.md](QUICK_START_MYSQL.md)
+- **Migration Details**: See [MIGRATION_SUMMARY.md](MIGRATION_SUMMARY.md)
 
 ## Project Structure
 

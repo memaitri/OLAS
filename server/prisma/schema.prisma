@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -51,7 +51,7 @@ model Exam {
   startTime        DateTime
   endTime          DateTime
   duration         Int
-  allowedLanguages String[]
+  allowedLanguages Json
   maxViolations    Int      @default(3)
   questions        Json
   createdAt        DateTime @default(now())

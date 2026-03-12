@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Test database connection
 prisma.$connect()
-  .then(() => console.log('✅ Connected to Supabase (PostgreSQL)'))
+  .then(() => console.log('✅ Connected to MySQL Database'))
   .catch((err) => console.error('❌ Database connection error:', err));
 
 // Make io accessible to routes
