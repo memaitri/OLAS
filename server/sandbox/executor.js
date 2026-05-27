@@ -22,6 +22,7 @@ const languageConfigs = {
   python: {
     extension: 'py',
     compile: null,
+    // Try python first, fall back to python3
     execute: (filename) => `python "${filename}"`
   },
   java: {
@@ -30,7 +31,7 @@ const languageConfigs = {
     execute: (filename) => {
       const className = path.basename(filename, '.java');
       const dir = path.dirname(filename);
-      return `cd "${dir}" && java ${className}`;
+      return `cd "${dir}" && java -cp "${dir}" ${className}`;
     }
   },
   c: {
@@ -56,9 +57,15 @@ export const executeCodeInSandbox = async (code, language, input = '') => {
   const timestamp = Date.now();
   const filename = path.join(TEMP_DIR, `code_${timestamp}.${config.extension}`);
   const outputFile = path.join(TEMP_DIR, `output_${timestamp}`);
+  const inputFile = path.join(TEMP_DIR, `input_${timestamp}.txt`);
 
   try {
     await fs.writeFile(filename, code);
+
+    // Write input to a temp file so we can pipe it via shell redirection
+    if (input) {
+      await fs.writeFile(inputFile, input);
+    }
 
     if (config.compile) {
       const compileCmd = config.compile(filename, outputFile);
@@ -74,12 +81,16 @@ export const executeCodeInSandbox = async (code, language, input = '') => {
       }
     }
 
-    const executeCmd = config.execute(config.compile ? outputFile : filename);
-    
+    const baseCmd = config.execute(config.compile ? outputFile : filename);
+    // Use shell redirection for input instead of the unsupported `input` option
+    const executeCmd = input
+      ? `${baseCmd} < "${inputFile}"`
+      : baseCmd;
+
     try {
       const { stdout, stderr } = await execPromise(executeCmd, {
         timeout: TIMEOUT,
-        input: input || undefined
+        shell: true
       });
 
       return {
@@ -89,6 +100,31 @@ export const executeCodeInSandbox = async (code, language, input = '') => {
         executionTime: Date.now() - startTime
       };
     } catch (error) {
+      // If python failed, try python3
+      if (language.toLowerCase() === 'python' && error.code === 'ENOENT') {
+        try {
+          const py3Cmd = baseCmd.replace(/^python /, 'python3 ');
+          const fallbackCmd = input ? `${py3Cmd} < "${inputFile}"` : py3Cmd;
+          const { stdout, stderr } = await execPromise(fallbackCmd, {
+            timeout: TIMEOUT,
+            shell: true
+          });
+          return {
+            success: true,
+            output: stdout || stderr,
+            error: stderr && !stdout ? stderr : null,
+            executionTime: Date.now() - startTime
+          };
+        } catch (py3Error) {
+          return {
+            success: false,
+            output: py3Error.stdout || '',
+            error: py3Error.stderr || py3Error.message,
+            executionTime: Date.now() - startTime
+          };
+        }
+      }
+
       if (error.killed) {
         return {
           success: false,
@@ -107,7 +143,8 @@ export const executeCodeInSandbox = async (code, language, input = '') => {
     }
   } finally {
     try {
-      await fs.unlink(filename);
+      await fs.unlink(filename).catch(() => {});
+      await fs.unlink(inputFile).catch(() => {});
       if (config.compile) {
         await fs.unlink(outputFile).catch(() => {});
         if (language.toLowerCase() === 'java') {

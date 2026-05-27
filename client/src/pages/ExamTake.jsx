@@ -20,24 +20,30 @@ const ExamTake = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
+  const [fullscreenReady, setFullscreenReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const socketRef = useRef(null);
   const autoSaveInterval = useRef(null);
   const hasSubmitted = useRef(false);
 
-  useEffect(() => {
-    // Request fullscreen immediately when component mounts
-    const enterFullscreen = async () => {
-      try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-        }
-      } catch (error) {
-        console.error('Failed to enter fullscreen:', error);
-        toast.error('Please allow fullscreen to take the exam');
+  // Enter fullscreen via user gesture (browser requires a click)
+  const enterFullscreen = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      } else if (document.documentElement.webkitRequestFullscreen) {
+        await document.documentElement.webkitRequestFullscreen();
+      } else if (document.documentElement.mozRequestFullScreen) {
+        await document.documentElement.mozRequestFullScreen();
       }
-    };
+      setFullscreenReady(true);
+    } catch (error) {
+      console.error('Failed to enter fullscreen:', error);
+      toast.error('Fullscreen is required to take the exam. Please try again.');
+    }
+  };
 
-    enterFullscreen();
+  useEffect(() => {
     loadExam();
     socketRef.current = initSocket();
 
@@ -194,6 +200,7 @@ const ExamTake = () => {
   const handleAutoSubmit = async (reason) => {
     if (hasSubmitted.current) return;
     hasSubmitted.current = true;
+    setIsSubmitting(true); // disable proctoring before navigation
 
     toast.info(`Auto-submitting exam: ${reason}`);
     
@@ -227,6 +234,7 @@ const ExamTake = () => {
     }
 
     hasSubmitted.current = true;
+    setIsSubmitting(true); // disable proctoring before navigation
 
     try {
       // Save current code
@@ -261,14 +269,52 @@ const ExamTake = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!exam || !session || isBlocked) {
+  // Blocked screen
+  if (isBlocked) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">
-            {isBlocked ? 'Access Blocked' : 'Loading...'}
+          <h1 className="text-2xl font-bold mb-4">Access Blocked</h1>
+          <p>You have been blocked from this exam due to violations.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Fullscreen gate — must come before loading check so the button is always shown first
+  // Browser requires a user gesture (click) to enter fullscreen — cannot do it programmatically on load
+  if (!fullscreenReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="text-center max-w-md px-6">
+          <div className="text-6xl mb-6">🖥️</div>
+          <h1 className="text-3xl font-bold mb-4">
+            {exam ? exam.title : 'Exam'}
           </h1>
-          {isBlocked && <p>You have been blocked from this exam due to violations.</p>}
+          <p className="text-gray-300 mb-2">This exam requires fullscreen mode.</p>
+          <p className="text-gray-400 text-sm mb-8">
+            Exiting fullscreen, switching tabs, or opening other windows will be recorded as violations.
+          </p>
+          <button
+            onClick={enterFullscreen}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold px-10 py-4 rounded-xl transition-colors shadow-lg"
+          >
+            Enter Fullscreen &amp; Start Exam
+          </button>
+          {!exam && (
+            <p className="text-gray-500 text-sm mt-4">Loading exam details...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Loading check after fullscreen gate
+  if (!exam || !session) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
         </div>
       </div>
     );
@@ -285,6 +331,7 @@ const ExamTake = () => {
         onViolation={handleViolation}
         onBlock={handleBlock}
         socket={socketRef.current}
+        disabled={isSubmitting}
       />
 
       {/* Header */}
